@@ -1,0 +1,4 @@
+name: SQLTest
+version: ${project.version}
+main: me.border.sqltest.SQLTest
+api-version: 1.13
