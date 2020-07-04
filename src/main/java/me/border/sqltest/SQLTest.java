@@ -1,10 +1,11 @@
 package me.border.sqltest;
 
-import me.border.sqltest.storage.IDatabase;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public class SQLTest extends JavaPlugin {
 
@@ -22,22 +23,41 @@ public class SQLTest extends JavaPlugin {
         new BukkitRunnable() {
             @Override
             public void run() {
-                if (!database.tableExists("PlayerData"))
-                    database.createTable("PlayerData", "Name", "UUID", 16, 36);
+                CompletableFuture<Boolean> tableExistsFuture = database.tableExists("PlayerData");
+                tableExistsFuture.whenComplete((b, err) -> {
+                    try {
+                        if (!tableExistsFuture.get()){
+                            database.createTable("PlayerData", "Name", "UUID", 16, 36);
+                        }
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                });
+
                 String uuid = "d1152d23-501a-4907-a0ce-44c4de2c3990";
                 String setRowQuery = "Name FROM PlayerData WHERE UUID='" + uuid + "'";
-                if (!database.rowExists(setRowQuery))
-                    database.setData("PlayerData(Name, UUID) VALUES('MrBorder','" + uuid + "')");
+                CompletableFuture<Boolean> rowExistsFuture = database.rowExists(setRowQuery);
+                rowExistsFuture.whenComplete((b, err) -> {
+                    try {
+                        if (!rowExistsFuture.get()){
+                            database.setData("PlayerData(Name, UUID) VALUES('MrBorder','" + uuid + "')");
+                        }
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                });
 
-                UUID uuidObj = database.getPlayerUUID("MrBorder");
-                String name = database.getPlayerName(uuidObj);
-
-                System.out.println(uuidObj);
-                System.out.println(name);
+                CompletableFuture<ObjectsWrapper<UUID, String, ?, ?>> profileFuture = database.getPlayerProfile("MrBorder");
+                profileFuture.whenComplete((b, err) ->{
+                    try {
+                        System.out.println("UUID = " + profileFuture.get().getT());
+                        System.out.println("Name = " + profileFuture.get().getV());
+                    } catch (InterruptedException | ExecutionException e) {
+                        e.printStackTrace();
+                    }
+                });
             }
         }.runTaskLater(this, 40L);
-
-        // Plugin startup logic
     }
 
     @Override

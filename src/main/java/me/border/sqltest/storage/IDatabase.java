@@ -1,11 +1,9 @@
 package me.border.sqltest.storage;
 
-import me.border.sqltest.ObjectWrapper;
 import me.border.sqltest.SQLTest;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import javax.sound.midi.SysexMessage;
 import java.sql.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -62,7 +60,7 @@ public abstract class IDatabase {
         }.runTaskAsynchronously(plugin);
     }
 
-    public boolean tableExists(String table) {
+    public CompletableFuture<Boolean> tableExists(String table) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         new BukkitRunnable() {
             @Override
@@ -76,27 +74,30 @@ public abstract class IDatabase {
             }
         }.runTaskAsynchronously(plugin);
 
-        System.out.println(future == null);
-        return translateFuture(future);
+        return future;
     }
 
-    public boolean rowExists(String sql){
+    public CompletableFuture<Boolean> rowExists(String sql){
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         new BukkitRunnable() {
             @Override
             public void run() {
-                try {
-                    future.complete(getData(sql).next());
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
+                CompletableFuture<ResultSet> resultFuture = getData(sql);
+                    resultFuture.whenComplete((b, err) ->{
+                        try {
+                            ResultSet result = resultFuture.get();
+                            future.complete(result.next());
+                        } catch (InterruptedException | ExecutionException | SQLException e) {
+                            e.printStackTrace();
+                        }
+                    });
             }
         }.runTaskAsynchronously(plugin);
 
-        return translateFuture(future);
+        return future;
     }
 
-    public ResultSet getData(String sql) {
+    public CompletableFuture<ResultSet> getData(String sql) {
         CompletableFuture<ResultSet> future = new CompletableFuture<>();
         new BukkitRunnable() {
             @Override
@@ -110,21 +111,7 @@ public abstract class IDatabase {
             }
         }.runTaskAsynchronously(plugin);
 
-        return translateFuture(future);
-    }
-
-    public <T> T translateFuture(CompletableFuture<T> future){
-        ObjectWrapper<T> t = new ObjectWrapper<>();
-        future.whenComplete((b, err) ->{
-            try {
-                t.set(future.get());
-                System.out.println("Should be 1" + t.get());
-            } catch (InterruptedException | ExecutionException e) {
-                e.printStackTrace();
-            }
-        });
-        System.out.println("Should be 2 " + t.get());
-        return t.get();
+        return future;
     }
 
     public void setData(String sql) {
@@ -183,5 +170,4 @@ public abstract class IDatabase {
             }
         }.runTaskAsynchronously(plugin);
     }
-
 }

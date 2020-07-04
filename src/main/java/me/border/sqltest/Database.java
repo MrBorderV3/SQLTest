@@ -3,6 +3,7 @@ package me.border.sqltest;
 import me.border.sqltest.storage.IDatabase;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import javax.xml.transform.Result;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
@@ -14,40 +15,43 @@ public class Database extends IDatabase {
         super(host, database, username, password, port);
     }
 
-    public String getPlayerName(UUID uuid){
-        CompletableFuture<String> future = new CompletableFuture<>();
-        new BukkitRunnable(){
-            @Override
-            public void run() {
+    public CompletableFuture<ObjectsWrapper<UUID, String, ?, ?>> getPlayerProfile(UUID uuid) {
+        CompletableFuture<ObjectsWrapper<UUID, String, ?, ?>> future = new CompletableFuture<>();
+        CompletableFuture<ResultSet> resultFuture = getData("* FROM PlayerData WHERE UUID='" + uuid.toString() + "'");
+        resultFuture.whenComplete((b, err) -> {
                 try {
-                    ResultSet result = getData("Name FROM PlayerData WHERE UUID='" + uuid.toString() + "'");
-                    if (result.next())
-                        future.complete(result.getString("Name"));
-                } catch (SQLException e){
-                    e.printStackTrace();
+                ResultSet result = resultFuture.get();
+                if (result.next()) {
+                    ObjectsWrapper<UUID, String, ? , ?> profileWrapper = new ObjectsWrapper<>();
+                    profileWrapper.setT(UUID.fromString(result.getString("UUID")));
+                    profileWrapper.setV(result.getString("Name"));
+                    future.complete(profileWrapper);
                 }
+            } catch (SQLException | InterruptedException | ExecutionException e) {
+                e.printStackTrace();
             }
-        }.runTaskAsynchronously(plugin);
+        });
 
-        return translateFuture(future);
+        return future;
     }
 
-    public UUID getPlayerUUID(String name){
-        CompletableFuture<UUID> future = new CompletableFuture<>();
-        new BukkitRunnable(){
-            @Override
-            public void run() {
-                try {
-                    ResultSet result = getData("UUID FROM PlayerData WHERE Name='" + name + "'");
-                    if (result.next())
-                        future.complete(UUID.fromString(result.getString("UUID")));
-                } catch (SQLException e){
-                    e.printStackTrace();
+    public CompletableFuture<ObjectsWrapper<UUID, String, ?, ?>> getPlayerProfile(String name) {
+        CompletableFuture<ObjectsWrapper<UUID, String, ?, ?>> future = new CompletableFuture<>();
+        CompletableFuture<ResultSet> resultFuture = getData("* FROM PlayerData WHERE Name='" + name + "'");
+        resultFuture.whenComplete((b, err) -> {
+            try {
+                ResultSet result = resultFuture.get();
+                if (result.next()) {
+                    ObjectsWrapper<UUID, String, ? , ?> profileWrapper = new ObjectsWrapper<>();
+                    profileWrapper.setT(UUID.fromString(result.getString("UUID")));
+                    profileWrapper.setV(result.getString("Name"));
+                    future.complete(profileWrapper);
                 }
+            } catch (SQLException | InterruptedException | ExecutionException e) {
+                e.printStackTrace();
             }
-        }.runTaskAsynchronously(plugin);
+        });
 
-        return translateFuture(future);
+        return future;
     }
-
 }
