@@ -28,19 +28,17 @@ public abstract class IDatabase {
         startDb();
     }
 
-    public CompletableFuture<Boolean> createTableIfDoesntExist(String tableName, String sql) {
+    public CompletableFuture<Boolean> createTableIfNotExists(String tableName, String sql) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         new BukkitRunnable() {
             @Override
             public void run() {
                 try {
                     ResultSet result = metaData.getTables(null, null, tableName, null);
-                    boolean complete = result.next();
-                    if (!complete) {
-                        PreparedStatement ps = connection.prepareStatement("CREATE TABLE " + tableName + "(" + sql + ");");
-                        ps.execute();
-                        ps.close();
-                    }
+                    PreparedStatement ps = connection.prepareStatement("CREATE TABLE " + tableName + "(" + sql + ");");
+                    boolean complete = ps.execute();
+                    ps.close();
+
                     future.complete(complete);
                 } catch (SQLException e) {
                     e.printStackTrace();
@@ -51,24 +49,21 @@ public abstract class IDatabase {
         return future;
     }
 
-    public CompletableFuture<Boolean> createTableIfDoesntExist(String tableName, String column1, String column2, int column1length, int column2length) {
+    public CompletableFuture<Boolean> createTableIfNotExists(String tableName, String column1, String column2, int column1length, int column2length) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         new BukkitRunnable() {
             @Override
             public void run() {
                 try {
-                    ResultSet result = metaData.getTables(null, null, tableName, null);
-                    boolean complete = result.next();
-                    if (!complete) {
-                        String idString = "id" + " INT NOT NULl AUTO_INCREMENT, ";
-                        String column1Full = column1 + " VARCHAR(" + column1length + "), ";
-                        String column2Full = column2 + " VARCHAR(" + column2length + "), ";
-                        String primaryKey = "PRIMARY KEY(id)";
-                        String query = "CREATE TABLE " + tableName + "(" + idString + column1Full + column2Full + primaryKey + ");";
-                        PreparedStatement ps = connection.prepareStatement(query);
-                        ps.execute();
-                        ps.close();
-                    }
+                    String idString = "id" + " INT NOT NULl AUTO_INCREMENT, ";
+                    String column1Full = column1 + " VARCHAR(" + column1length + "), ";
+                    String column2Full = column2 + " VARCHAR(" + column2length + "), ";
+                    String primaryKey = "PRIMARY KEY(id)";
+                    String query = "CREATE TABLE IF NOT EXISTS " + tableName + "(" + idString + column1Full + column2Full + primaryKey + ");";
+                    PreparedStatement ps = connection.prepareStatement(query);
+                    boolean complete = ps.execute();
+                    ps.close();
+
                     future.complete(complete);
                 } catch (SQLException e) {
                     e.printStackTrace();

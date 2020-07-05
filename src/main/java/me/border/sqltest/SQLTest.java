@@ -27,7 +27,7 @@ public class SQLTest extends JavaPlugin {
                 String uuid = "d1152d23-501a-4907-a0ce-44c4de2c3990";
                 String setRowQuery = "* FROM PlayerData WHERE UUID='" + uuid + "'";
 
-                CompletableFuture<Boolean> tableFuture = database.createTableIfDoesntExist("PlayerData", "Name", "UUID", 16, 36);
+                CompletableFuture<Boolean> tableFuture = database.createTableIfNotExists("PlayerData", "Name", "UUID", 16, 36);
                 tableFuture.whenComplete((b, err) -> {
                     CompletableFuture<Boolean> rowFuture = database.createRowIfDoesntExist("PlayerData(Name, UUID) VALUES('MrBorder','" + uuid + "')", setRowQuery);
                     rowFuture.whenComplete((b2, err2) -> {
