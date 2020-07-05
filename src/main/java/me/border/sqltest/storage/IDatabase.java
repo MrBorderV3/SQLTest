@@ -6,14 +6,13 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import java.sql.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 public abstract class IDatabase {
 
     protected JavaPlugin plugin = SQLTest.getInstance();
-    private Connection connection;
-    protected Statement statement;
+    protected Connection connection;
     protected DatabaseMetaData metaData;
+
     private String host;
     private String database;
     private String username;
@@ -29,35 +28,55 @@ public abstract class IDatabase {
         startDb();
     }
 
-    public void createTable(String tableName, String sql) {
+    public CompletableFuture<Boolean> createTableIfDoesntExist(String tableName, String sql) {
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
         new BukkitRunnable() {
             @Override
             public void run() {
                 try {
-                    statement.execute("CREATE TABLE " + tableName + "(" + sql + ");");
+                    ResultSet result = metaData.getTables(null, null, tableName, null);
+                    boolean complete = result.next();
+                    if (!complete) {
+                        PreparedStatement ps = connection.prepareStatement("CREATE TABLE " + tableName + "(" + sql + ");");
+                        ps.execute();
+                        ps.close();
+                    }
+                    future.complete(complete);
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
             }
         }.runTaskAsynchronously(plugin);
+
+        return future;
     }
 
-    public void createTable(String tableName, String column1, String column2, int column1length, int column2length) {
+    public CompletableFuture<Boolean> createTableIfDoesntExist(String tableName, String column1, String column2, int column1length, int column2length) {
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
         new BukkitRunnable() {
             @Override
             public void run() {
                 try {
-                    String idString = "id" + " INT NOT NULl AUTO_INCREMENT, ";
-                    String column1Full = column1 + " VARCHAR(" + column1length + "), ";
-                    String column2Full = column2 + " VARCHAR(" + column2length + "), ";
-                    String primaryKey = "PRIMARY KEY(id)";
-                    String query = "CREATE TABLE " + tableName + "(" + idString + column1Full + column2Full + primaryKey + ");";
-                    statement.execute(query);
+                    ResultSet result = metaData.getTables(null, null, tableName, null);
+                    boolean complete = result.next();
+                    if (!complete) {
+                        String idString = "id" + " INT NOT NULl AUTO_INCREMENT, ";
+                        String column1Full = column1 + " VARCHAR(" + column1length + "), ";
+                        String column2Full = column2 + " VARCHAR(" + column2length + "), ";
+                        String primaryKey = "PRIMARY KEY(id)";
+                        String query = "CREATE TABLE " + tableName + "(" + idString + column1Full + column2Full + primaryKey + ");";
+                        PreparedStatement ps = connection.prepareStatement(query);
+                        ps.execute();
+                        ps.close();
+                    }
+                    future.complete(complete);
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
             }
         }.runTaskAsynchronously(plugin);
+
+        return future;
     }
 
     public CompletableFuture<Boolean> tableExists(String table) {
@@ -77,20 +96,44 @@ public abstract class IDatabase {
         return future;
     }
 
-    public CompletableFuture<Boolean> rowExists(String sql){
+    public CompletableFuture<Boolean> rowExists(String sql) {
         CompletableFuture<Boolean> future = new CompletableFuture<>();
-        new BukkitRunnable() {
+        new BukkitRunnable(){
             @Override
             public void run() {
-                CompletableFuture<ResultSet> resultFuture = getData(sql);
-                    resultFuture.whenComplete((b, err) ->{
-                        try {
-                            ResultSet result = resultFuture.get();
-                            future.complete(result.next());
-                        } catch (InterruptedException | ExecutionException | SQLException e) {
-                            e.printStackTrace();
-                        }
-                    });
+                try {
+                    PreparedStatement ps = connection.prepareStatement("SELECT " + sql + ";");
+                    ResultSet result = ps.executeQuery();
+                    future.complete(result.next());
+                    ps.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+        }.runTaskAsynchronously(plugin);
+
+        return future;
+    }
+
+    public CompletableFuture<Boolean> createRowIfDoesntExist(String sql, String rowQuery){
+        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        new BukkitRunnable(){
+            @Override
+            public void run() {
+                try {
+                    PreparedStatement ps = connection.prepareStatement("SELECT " + rowQuery + ";");
+                    ResultSet result = ps.executeQuery();
+                    boolean complete = result.next();
+                    ps.close();
+                    if (!complete){
+                        PreparedStatement psUpdate = connection.prepareStatement("INSERT INTO " + sql + ";");
+                        psUpdate.executeUpdate("INSERT INTO " + sql + ";");
+                        psUpdate.close();
+                    }
+                    future.complete(complete);
+                }catch (SQLException e){
+                    e.printStackTrace();
+                }
             }
         }.runTaskAsynchronously(plugin);
 
@@ -102,9 +145,11 @@ public abstract class IDatabase {
         new BukkitRunnable() {
             @Override
             public void run() {
-                String query = "SELECT " + sql + ";";
                 try {
-                    future.complete(statement.executeQuery(query));
+                    String query = "SELECT " + sql + ";";
+                    PreparedStatement ps = connection.prepareStatement(query);
+                    future.complete(ps.executeQuery());
+                    ps.close();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -119,7 +164,9 @@ public abstract class IDatabase {
             @Override
             public void run() {
                 try {
-                    statement.executeUpdate("INSERT INTO " + sql + ";");
+                    PreparedStatement ps = connection.prepareStatement("INSERT INTO " + sql + ";");
+                    ps.executeUpdate("INSERT INTO " + sql + ";");
+                    ps.close();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -147,8 +194,6 @@ public abstract class IDatabase {
 
     public void closeConnection(){
         try {
-            if (statement != null && !statement.isClosed())
-                statement.close();
             if (connection != null && !connection.isClosed())
                 connection.close();
         } catch (SQLException e){
@@ -162,7 +207,6 @@ public abstract class IDatabase {
             public void run() {
                 try {
                     openConnection();
-                    statement = connection.createStatement();
                     metaData = connection.getMetaData();
                 } catch (SQLException e) {
                     e.printStackTrace();
