@@ -19,7 +19,7 @@ public class SQLTest extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
-        this.database = new Database("localhost", "spigot", "root", "Lmao777gyre1", 3306);
+        this.database = new Database("localhost", "spigot", "root, PASSWORD, 3306);
         new BukkitRunnable() {
             @Override
             public void run() {
